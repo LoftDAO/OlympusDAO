@@ -1,0 +1,126 @@
+---
+title: "OlympusDAO"
+author: "Simon Tian"
+date: "2021/11/10"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## OlympusDAO
+This article is going to lay down all the technical details especially about math, 
+pricing mechanisms, and equations, etc.
+
+
+### Bond Terms
+
+- `controlVariable`: scaling variable for price, 300
+- `vestingTerm`: in blocks, avg block time is 14 seconds, 33110
+- `minimumPrice`: vs principle value, 1600
+- `maxPayout`: in thousandths, 50
+- `fee`: as % of bond payout, in hundredths, 10000
+- `maxDebt`: 9 decimal debt ratio, max % total supply created as debt, 33000000000000
+- `initialDebt`: total value of outstanding bonds; used for pricing, 25614114861660
+
+The discount would not be 1 since some initial value is given to a new bond. Still
+need to figure out how it works out. Is it fair to give an initial value for a 
+bond?
+
+### Bond Price in USD
+If the bond is bond for liquidity tokens, suppose price is denoted as $p$, then, 
+
+$p=a * b$, where $a$ is `bondPrice` and $b$ is $
+
+    /**
+     *  @notice converts bond price to DAI value
+     *  @return price_ uint
+     */
+    function bondPriceInUSD() public view returns (uint price_) {
+        if (isLiquidityBond) {
+            price_ = bondPrice() * IBondCalculator(bondCalculator).markdown(principle) / 100;
+        } else {
+            price_ = bondPrice() * 10**IERC20Metadata(principle).decimals() / 100;
+        }
+    }
+
+    
+Function: deposit(uint256 _amount, uint256 _maxPrice, address _depositor)
+
+`_amount`: 30019581459258
+`_maxPrice`: 1736
+`_depositor`: 0x3524c03d39a13d51485419a17586286a6b617dd3
+
+
+### Rebase
+
+`rebase = 1 - ohmDeposits/sOHM_Outstanding`
+
+The treasury deposits OHM into the distributor. The distributor then deposits OHM into the staking contract, creating an imbalance between OHM and sOHM. sOHM is rebased to correct this imbalance between OHM deposited and sOHM outstanding. The rebase brings sOHM outstanding back up to parity so that 1 sOHM equals 1 staked OHM.
+
+
+
+
+
+### Mark down
+
+Current Debt is what is used for Bond calculations. 
+Total Debt = Current Debt + Debt Decay (Debt that has matured, but remains unclaimed by the user)
+
+Liquidity Bonds need debt to be standardized in order to compare apples/apples. If you take LP Bond's Current Debt and multiply it by that LP's Markdown then you get an apples/apples comparison of Debt for Reserve/Liquidity Bond contracts.
+
+OHMDAI LP Markdown example:
+D = # of Dai in the Liquidity Pool in Sushi
+O = # of OHM in the Liquidity Pool in Sushi
+Markdown = (2 * D) / (SQRT(O * D) * 2)
+
+
+# Pay attention to debt ratio and debt ratio decay if you want to predict bond discounts
+
+
+
+
+# debt decay
+I'll post my idea here for how to potentially resolve the bonding issue being discussed in General. It's either getting lost in the noise or ignored because it's too smoothbrain, but I'd like acknowledgment on why if so lol
+
+What if instead of waiting until OHM are actually redeemed to increase the discount on new bonds, it accounts for the OHM redeemable? Effectively count them as redeemed as they accrue. This way someone couldn't wait until they have hundreds of OHM redeemable and then jump the rate for themselves to immediately claim again.
+
+With this method the discount would slowly creep up as rewards are disbursed and wouldn't be able to be randomly spiked to an individual's advantage. Ohmies would then be able to bond when it naturally rises to a discount that they would want to bond at.
+
+Am I missing a simple flaw here? Just spit-balling an idea 
+
+
+debt decay sounds like a quantity that can be instantaneously calculated given all
+time points.
+
+
+Risk-free value of lp tokens
+ risk free value of OHM-DAI LP = sqrt ( number of ohm in LP * number of DAI in LP)
+
+
+
+
+for bonds, we value LP at RFV
+payout to bonder = RFV/premium
+protocol profit = RFV - payout
+[7:34 AM] g17tem: would someone mind sharing the APY table
+[7:37 AM] Zeus ( ^, ^): the one in the intro article isnt necessarily accurate
+[7:37 AM] Zeus ( ^, ^): all depends on policy state
+[7:37 AM] Zeus ( ^, ^): APY = (epoch rebase) ^ (365 * 3)
+[7:38 AM] Zeus ( ^, ^): Bond profit = RFV - (RFV / (1+ (Debt ratio * BCV)))
+[7:38 AM] Zeus ( ^, ^): Sales profit = (price - 1)^2 * supply * ICV
+
+
+[9:46 AM] Zeus ( ^, ^): LP token number != constant product
+[9:46 AM] Zeus ( ^, ^): constant product = side 1 * side 2
+[9:46 AM] Zeus ( ^, ^):
+
+[9:47 AM] Zeus ( ^, ^): constant product = (4501*1886663) = 8,491,870,163
+[9:47 AM] Zeus ( ^, ^): total RFV of pool = 2sqrt(CP) = 184,302.68
+[9:47 AM] Zeus ( ^, ^): total LP = 2.76
+[9:48 AM] Zeus ( ^, ^): RFV of your LP = (your LP / 2.76) * 184,302.68 
+[9:48 AM] Zeus ( ^, ^): if u cant tell, bonds are a bit inefficient at adding supply cuz theyre valued much lower than what theyre worth rn
+[9:49 AM] Zeus ( ^, ^): but thats not a terrible dynamic rn bc supply is low and that difference is a premium paid to the market
+[9:49 AM] Zeus ( ^, ^): and the market is the token holders so it kinda goes full circle
+
